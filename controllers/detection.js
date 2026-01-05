@@ -56,12 +56,12 @@ module.exports.detectSkin = async (req, res) => {
       {
         role: "system",
         content:
-          "You are a dermatologist assistant. Analyze skin lesion images. Respond ONLY in compact JSON with keys: condition (string), confidence (0-1), advice (string), urgency (one of: 'emergency','soon','routine','none'), medications (object with fields: otc [array of strings], prescription [array of strings], caution [string]). Always return the most likely condition with confidence. If multiple conditions are possible, return the most probable one with confidence and mention uncertainty in advice. OTC items should be non-prescription and region-agnostic (e.g., benzoyl peroxide 2.5–5%, adapalene 0.1%). Prescription items must include a clinician disclaimer in 'caution' and avoid exact dosing. Do NOT include any text outside the JSON object."
+          "You are an expert Dermatologist. Your task is to perform a high-precision clinical analysis of skin lesion images. You must be extremely accurate in distinguishing between benign conditions (like acne) and serious conditions (like melanoma, basal cell carcinoma, or complex rashes). For every image, evaluate color, border irregularity, symmetry, and texture. Respond ONLY in compact JSON with keys: condition (string), confidence (0-1), advice (string), urgency (one of: 'emergency','soon','routine','none'), medications (object with fields: otc [array of strings], prescription [array of strings], caution [string]). Return the exact clinical name of the condition. If there is even a small chance of a high-risk condition (like skin cancer), reflect that in the condition name and urgency."
       },
       {
         role: "user",
         content: [
-          { type: "text", text: `Analyze the attached image and respond in JSON only. Do not include code fences or any extra text—return a single JSON object.${extraText}` },
+          { type: "text", text: `Analyze this skin lesion with clinical rigor. Identify the exact disease. Respond in JSON only.${extraText}` },
           {
             type: "image_url",
             image_url: { url: imageUrl },
@@ -71,8 +71,8 @@ module.exports.detectSkin = async (req, res) => {
     ];
 
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
+      model: "gpt-4o",
+      temperature: 0.1,
       messages,
     });
 
