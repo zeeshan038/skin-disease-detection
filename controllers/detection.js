@@ -56,12 +56,23 @@ module.exports.detectSkin = async (req, res) => {
       {
         role: "system",
         content:
-          "You are an expert Dermatologist. Your task is to perform a high-precision clinical analysis of skin lesion images. You must be extremely accurate in distinguishing between benign conditions (like acne) and serious conditions (like melanoma, basal cell carcinoma, or complex rashes). For every image, evaluate color, border irregularity, symmetry, and texture. Respond ONLY in compact JSON with keys: condition (string), confidence (0-1), advice (string), urgency (one of: 'emergency','soon','routine','none'), medications (object with fields: otc [array of strings], prescription [array of strings], caution [string]). Return the exact clinical name of the condition. If there is even a small chance of a high-risk condition (like skin cancer), reflect that in the condition name and urgency."
+          "You are an AI assistant specialized in dermatological analysis. Your task is to provide a preliminary informational assessment of skin lesions. " +
+          "IMPORTANT: You are NOT a doctor. Your analysis is for educational purposes only and is not a clinical diagnosis. " +
+          "Always advise the user to consult a board-certified dermatologist for any skin concerns. " +
+          "You must evaluate the image using the ABCDE criteria: " +
+          "1. Asymmetry (is one half unlike the other?) " +
+          "2. Border (is it irregular, scalloped, or poorly defined?) " +
+          "3. Color (are there multiple shades of tan, brown, black, or red?) " +
+          "4. Diameter (is it larger than 6mm?) " +
+          "5. Evolving (based on user notes, is it changing?). " +
+          "If any of these features suggest malignancy (like melanoma or basal cell carcinoma), you MUST prioritize mentioning that possibility and setting high urgency. " +
+          "If the image is not clear enough, or if it violates safety policies, state that in the 'condition' field. " +
+          "Respond ONLY in compact JSON with keys: condition (string - most likely condition), confidence (0-1), advice (general care and next steps), urgency (one of: 'emergency','soon','routine','none'), medications (object with fields: otc [array], prescription [array of classes, NOT brand names], caution [string])."
       },
       {
         role: "user",
         content: [
-          { type: "text", text: `Analyze this skin lesion with clinical rigor. Identify the exact disease. Respond in JSON only.${extraText}` },
+          { type: "text", text: `Analyze the characteristics of this skin image and suggest likely conditions or next steps. Respond in JSON only.${extraText}` },
           {
             type: "image_url",
             image_url: { url: imageUrl },
@@ -117,7 +128,11 @@ module.exports.detectSkin = async (req, res) => {
     const modelName = completion?.model || "gpt-4o-mini";
     const completionId = completion?.id || "";
 
-    const condition = parsed?.condition || "";
+    let condition = parsed?.condition || "";
+    // If AI returns an array, convert to string to avoid DB validation error
+    if (Array.isArray(condition)) {
+      condition = condition.join(", ");
+    }
     const confidence = typeof parsed?.confidence === 'number' ? parsed.confidence : null;
     const advice = parsed?.advice || "";
     const urgency = parsed?.urgency || "";
