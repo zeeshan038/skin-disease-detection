@@ -1,5 +1,7 @@
 //NPM Packages
 const jwt = require("jsonwebtoken");
+const dotenv = require("dotenv");
+dotenv.config();
 
 //genrating token
 const genrateToken = (id) => {

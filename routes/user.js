@@ -12,7 +12,6 @@ const {
   editProfile,
   getUserInfo,
   deleteUser,
-  uploadProfilePicture,
 } = require("../controllers/user");
 
 const verifyUser = require("../middlewares/verifyUser");

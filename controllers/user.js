@@ -76,7 +76,7 @@ module.exports.signup = async (req, res) => {
  */
 module.exports.login = async (req, res) => {
   const payload = req.body;
-
+  console.log("payload",payload);
   //Error Handling
   const result = loginSchema(payload);
   if (result.error) {
@@ -126,7 +126,7 @@ module.exports.login = async (req, res) => {
       });
   } catch (error) {
     return res.status(500).json({
-      errors: error,
+      errors: error.message
     });
   }
 };
@@ -514,3 +514,4 @@ module.exports.uploadProfilePicture = async (req, res) => {
     });
   }
 };
+
