@@ -56,29 +56,47 @@ module.exports.detectSkin = async (req, res) => {
       {
         role: "system",
         content:
-          "You are an AI assistant specialized in dermatological analysis. Your task is to provide a preliminary informational assessment of skin lesions. " +
-          "IMPORTANT: You are NOT a doctor. Your analysis is for educational purposes only and is not a clinical diagnosis. " +
-          "Always advise the user to consult a board-certified dermatologist for any skin concerns. " +
-          "You must evaluate the image using the ABCDE criteria: " +
-          "1. Asymmetry (is one half unlike the other?) " +
-          "2. Border (is it irregular, scalloped, or poorly defined?) " +
-          "3. Color (are there multiple shades of tan, brown, black, or red?) " +
-          "4. Diameter (is it larger than 6mm?) " +
-          "5. Evolving (based on user notes, is it changing?). " +
-          "If any of these features suggest malignancy (like melanoma or basal cell carcinoma), you MUST prioritize mentioning that possibility and setting high urgency. " +
-          "If the image is not clear enough, or if it violates safety policies, state that in the 'condition' field. " +
-          "Respond ONLY in compact JSON with keys: condition (string - most likely condition), confidence (0-1), advice (general care and next steps), urgency (one of: 'emergency','soon','routine','none'), medications (object with fields: otc [array], prescription [array of classes, NOT brand names], caution [string])."
+          "You are an AI assistant specialized in dermatological image analysis. Your task is to provide a preliminary, non-diagnostic informational assessment of visible skin lesions based on an image. " +
+          "IMPORTANT: You are NOT a doctor. Your analysis is for educational and informational purposes only and does NOT constitute a medical diagnosis. " +
+          "Always advise the user to consult a board-certified dermatologist or qualified healthcare professional for any skin-related concerns. " +
+          "You must NOT claim certainty, guarantee accuracy, or replace professional medical judgment. " +
+          "You must evaluate the image using the ABCDE criteria commonly used for skin lesion screening: " +
+          "1. Asymmetry — whether one half of the lesion differs from the other. " +
+          "2. Border — whether the edges are irregular, scalloped, or poorly defined. " +
+          "3. Color — whether there are multiple or uneven colors such as tan, brown, black, red, or white. " +
+          "4. Diameter — whether the lesion appears larger than approximately 6mm (if visually estimable). " +
+          "5. Evolving — assess change ONLY if the user provides historical information; otherwise mark as unknown. " +
+          "If any ABCDE features suggest possible malignancy (such as melanoma, basal cell carcinoma, or squamous cell carcinoma), you MUST prioritize mentioning those possibilities and set the urgency level to 'emergency' or 'soon'. " +
+          "If the image quality is insufficient, unclear, or does not allow a safe assessment, you must explicitly state that the analysis is inconclusive and must NOT guess or infer. " +
+          "Do NOT provide medication dosages. Prescription medications must be listed only as drug classes, never brand names. " +
+          "Respond ONLY in compact JSON using the exact structure below. Do not include explanations, markdown, or additional text outside JSON. " +
+          "The JSON response must strictly follow this schema: " +
+          "{ " +
+          "\"possible_conditions\": [ { \"name\": \"string\", \"confidence_level\": \"LOW | MEDIUM | HIGH\", \"reasoning\": \"string\" } ], " +
+          "\"most_likely_condition\": \"string\", " +
+          "\"urgency\": \"emergency | soon | routine | none\", " +
+          "\"advice\": \"string\", " +
+          "\"medications\": { " +
+          "\"otc\": [\"string\"], " +
+          "\"prescription\": [\"string\"], " +
+          "\"caution\": \"string\" " +
+          "}, " +
+          "\"medical_disclaimer\": \"This information is AI-generated and not a medical diagnosis. Consult a qualified dermatologist or healthcare professional for accurate diagnosis and treatment.\" " +
+          "}"
       },
       {
         role: "user",
         content: [
-          { type: "text", text: `Analyze the characteristics of this skin image and suggest likely conditions or next steps. Respond in JSON only.${extraText}` },
+          {
+            type: "text",
+            text: `Analyze the characteristics of this skin image and provide an AI-assisted dermatological assessment following the system instructions. Respond in JSON only.${extraText}`
+          },
           {
             type: "image_url",
-            image_url: { url: imageUrl },
-          },
-        ],
-      },
+            image_url: { url: imageUrl }
+          }
+        ]
+      }
     ];
 
     const completion = await client.chat.completions.create({
@@ -128,12 +146,24 @@ module.exports.detectSkin = async (req, res) => {
     const modelName = completion?.model || "gpt-4o-mini";
     const completionId = completion?.id || "";
 
-    let condition = parsed?.condition || "";
-    // If AI returns an array, convert to string to avoid DB validation error
+    // Mapping new schema to existing variables for DB compatibility
+    let condition = parsed?.most_likely_condition || parsed?.condition || "";
+    // If AI returns an array, convert to string
     if (Array.isArray(condition)) {
       condition = condition.join(", ");
     }
-    const confidence = typeof parsed?.confidence === 'number' ? parsed.confidence : null;
+
+    // Convert HIGH/MEDIUM/LOW confidence strings to numeric for the confidence field if needed
+    let confidence = null;
+    if (typeof parsed?.confidence === 'number') {
+      confidence = parsed.confidence;
+    } else {
+      const confStr = parsed?.possible_conditions?.[0]?.confidence_level || "";
+      if (confStr === "HIGH") confidence = 0.9;
+      else if (confStr === "MEDIUM") confidence = 0.6;
+      else if (confStr === "LOW") confidence = 0.3;
+    }
+
     const advice = parsed?.advice || "";
     const urgency = parsed?.urgency || "";
 
