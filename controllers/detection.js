@@ -227,35 +227,35 @@ module.exports.getDashboardStats = async (req, res) => {
     ]);
     const accuracyRate = avgConfidenceQuery.length > 0 ? (avgConfidenceQuery[0].avg * 100).toFixed(1) : 0;
 
-    // 4. Monthly Scans Analysis (Last 6 Months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    // 4. Monthly Scans Analysis (Current Year)
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
 
     const monthlyScans = await Detection.aggregate([
       {
         $match: {
           userId: _id,
-          createdAt: { $gte: sixMonthsAgo }
+          createdAt: { $gte: startOfYear }
         }
       },
       {
         $group: {
-          _id: {
-            month: { $month: "$createdAt" },
-            year: { $year: "$createdAt" }
-          },
+          _id: { $month: "$createdAt" },
           count: { $sum: 1 }
         }
       },
-      { $sort: { "_id.year": 1, "_id.month": 1 } }
+      { $sort: { "_id": 1 } }
     ]);
 
-    // Format monthly data for chart (e.g., "Jan", "Feb")
+    // Format monthly data for chart (showing all 12 months with 0 if no scans)
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const formattedMonthlyStats = monthlyScans.map(item => ({
-      month: monthNames[item._id.month - 1],
-      scans: item.count
-    }));
+    const formattedMonthlyStats = monthNames.map((month, index) => {
+      const dbMonth = monthlyScans.find(item => item._id === index + 1);
+      return {
+        month,
+        scans: dbMonth ? dbMonth.count : 0
+      };
+    });
 
     // 5. Conditions Distribution (Conditions Overview)
     const conditionsOverview = await Detection.aggregate([
